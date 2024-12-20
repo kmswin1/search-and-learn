@@ -72,5 +72,5 @@ def save_dataset(dataset, config):
         if config.output_dir is None:
             config.output_dir = f"data/{config.model_path}"
         Path(config.output_dir).mkdir(parents=True, exist_ok=True)
-        dataset.to_json(f"{config.output_dir}/bon_completions.jsonl", lines=True)
-        logger.info(f"Saved completions to {config.output_dir}/bon_completions.jsonl")
+        dataset.to_json(f"{config.output_dir}/{config.approach}.jsonl", lines=True)
+        logger.info(f"Saved completions to {config.output_dir}/{config.approach}.jsonl")

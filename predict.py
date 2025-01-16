@@ -17,6 +17,8 @@ elif dataset == "mathvision":
     ds = load_dataset("MathLLMs/MathVision")["test"]
 elif dataset == "clevrmath":
     ds = load_dataset("dali-does/clevr-math", "general", split="test")
+elif dataset == "mathverse":
+    ds = load_dataset("AI4Math/MathVerse", "testmini")["testmini"]
 
 from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoProcessor
 from qwen_vl_utils import process_vision_info
@@ -30,13 +32,14 @@ max_pixels = 1280 * 28 * 28
 processor = AutoProcessor.from_pretrained(model_name, min_pixels=min_pixels, max_pixels=max_pixels)
 
 file = model_name.split("/")[-1]
-with open("results/"+file+"_"+dataset+".jsonl", "w") as wf:
+with open("results_cot/"+file+"_"+dataset+".jsonl", "w") as wf:
     for meta in ds:
         try:
-            image = meta["decoded_image"] if dataset != "clevrmath" else meta["image"]
+            image = meta["decoded_image"] if dataset != "clevrmath" and dataset != "mathverse" else meta["image"]
             question = meta["query"] if dataset == "mathvista" else meta["question"]
             answer = meta["answer"] if dataset != "clevrmath" else meta["label"]
-            system_prompt = "Your task is to answer the question related to image. First, you describe about the image and then give step by step reasoning based on image description.\nUse this step-by-step format:\n\n## Image Description: [Image description]\n\n##Step 1: [Concise description]\n[Brief explanation and calculations]\n\n## Step 2: [Concise description]\n[Brief explanation and calculations]\n\n...\n\nWhen you’re ready to answer, conclude using the format \"Final answer: \""
+            # system_prompt = "Your task is to answer the question about the image. When you’re ready to answer, conclude using the format \"Final answer: \""
+            system_prompt = "Your task is to answer the question about the image. First, you describe about the image and then give step by step reasoning based on image description.\nUse this step-by-step format:\n\n## Image Description: [Image description]\n\n##Step 1: [Concise description]\n[Brief explanation and calculations]\n\n## Step 2: [Concise description]\n[Brief explanation and calculations]\n\n...\n\nWhen you’re ready to answer, conclude using the format \"Final answer: \""
             # system_prompt = "Solve the following image related problem efficiently and clearly:\n\n- For simple problems (2 steps or fewer):\nProvide a concise solution with minimal explanation.\n\n- For complex problems (3 steps or more):\nUse this step-by-step format:\n\n## Step 1: [Concise description]\n[Brief explanation and calculations]\n\n## Step 2: [Concise description]\n[Brief explanation and calculations]\n\n...\n\nRegardless of the approach, always conclude with:\n\nTherefore, the final answer is: . I hope it is correct."
             conversation = [
                 {
@@ -46,7 +49,7 @@ with open("results/"+file+"_"+dataset+".jsonl", "w") as wf:
                             "type": "image",
                         },
                         {"type": "text", 
-                        "text":  system_prompt + question + "\nLet's think step by step."
+                        "text":  system_prompt + "\n" + question
                         },
                     ],
                 }

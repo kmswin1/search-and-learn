@@ -71,28 +71,46 @@ with open("results_exp/"+file+"_"+dataset+"-step2.jsonl", "r") as f:
         subquestions.append([line["question"]] + line["subquestions"].split("\n"))
         captions.append(line["captions"])
 
-with open("results_exp/"+file+"_"+dataset+"-step3.jsonl", "w") as wf:
+# questions = []
+# with open("results_exp/"+file+"_"+dataset+"-step2.jsonl", "r") as f:
+#     for line in f:
+#         line = json.loads(line)
+#         questions.append(line["question"])
+        
+with open("results_exp/"+file+"_"+dataset+"-step3.jsonl", "a") as wf:
     for i, meta in enumerate(tqdm(ds)):
         try:
-            scene_graphs = []
+            # question = meta["query"] if dataset == "mathvista" else meta["question"]
+            # if question in questions:
+                # continue
+            # scene_graphs = []
             text_prompts = []
             images = []
+            captions = []
             for c, q in zip(captions[i], subquestions[i]):
+            # for q in subquestions[i]:
                 image = meta["decoded_image"] if dataset != "clevrmath" and dataset != "mathverse" and dataset != "seed" else meta["image"]
                 question = meta["query"] if dataset == "mathvista" else meta["question"]
                 answer = meta["answer"] if dataset != "clevrmath" else meta["label"]
-                instruction = """
-                            For the provided image and its associated image description and question, generate a scene graph in JSON format that includes the following:
-                            1. Objects that are relevant to answering the question.
-                            2. Object attributes that are relevant to answering the question.
-                            3. Object relationships that are relevant to answering the question.
-                            """
+                # instruction = """
+                #             For the provided image and its associated image description and question, generate a scene graph in JSON format that includes the following:
+                #             1. Objects that are relevant to answering the question.
+                #             2. Object attributes that are relevant to answering the question.
+                #             3. Object relationships that are relevant to answering the question.
+                #             """
+                # conversation = [
+                #                 {"role": "user", "content": [
+                #                     {"type": "image"},
+                #                     {"type": "text", "text": "Question: "+ q + "\n" + "Image caption: "+ c + "\n" + instruction} 
+                #                 ]}
+                #             ]
                 conversation = [
-                                {"role": "user", "content": [
-                                    {"type": "image"},
-                                    {"type": "text", "text": "Question: "+ q + "\n" + "Image caption: "+ c + "\n" + instruction} 
-                                ]}
-                            ]
+                            {"role": "user", "content": [
+                                {"type": "image"},
+                                {"type": "text", "text": "Question: "+ q + "\nDescribe and extract the key information from the image to answer the question."} 
+                            ]}
+                        ]
+
 
 
                 # Preprocess the inputs
@@ -116,7 +134,7 @@ with open("results_exp/"+file+"_"+dataset+"-step3.jsonl", "w") as wf:
                 generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True
             )
             for pred in output_text:
-                scene_graphs.append(pred)
+                captions.append(pred)
             
             del inputs
             del output_ids
@@ -125,8 +143,8 @@ with open("results_exp/"+file+"_"+dataset+"-step3.jsonl", "w") as wf:
             res["question"] = question
             res["answer"] = answer
             res["subquestions"] = subquestions[i]
-            res["captions"] = captions[i]
-            res["scene_graphs"] = scene_graphs
+            res["captions"] = captions
+            # res["scene_graphs"] = scene_graphs
             # res["prediction"] = pred if type(pred) == str else pred[0]
             wf.write(json.dumps(res)+"\n")
 
@@ -137,106 +155,17 @@ with open("results_exp/"+file+"_"+dataset+"-step3.jsonl", "w") as wf:
             res["answer"] = answer
             res["subquestions"] = []
             res["captions"] = []
-            res["scene_graphs"] = []
+            # res["scene_graphs"] = []
             wf.write(json.dumps(res)+"\n")
             pass
-            
-        # try:
-        #     captions = []
-        #     for q in subquestions[i]:
-        #     image = meta["decoded_image"] if dataset != "clevrmath" and dataset != "mathverse" and dataset != "seed" else meta["image"]
-        #     question = meta["query"] if dataset == "mathvista" else meta["question"]
-        #     answer = meta["answer"] if dataset != "clevrmath" else meta["label"]
-        #     conversation = [
-        #                     {"role": "user", "content": [
-        #                         {"type": "image"},
-        #                         {"type": "text", "text": "Question: "+ q + "\nDescribe and extract the key information from the image to answer the question."} 
-        #                     ]}
-        #                 ]
 
 
-        #     # Preprocess the inputs
-        #     text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
-        #     # Excepted output: '<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>Describe this image.<|im_end|>\n<|im_start|>assistant\n'
-
-        #     inputs = processor(
-        #         text=[text_prompt], images=[image], padding=True, return_tensors="pt"
-        #     )
-        #     inputs = inputs.to("cuda")
-        #     # Inference: Generation of the output
-        #     # output_ids = model.generate(**inputs, max_new_tokens=1024, temperature=0.0, do_sample=False)
-        #     output_ids = model.generate(**inputs, max_new_tokens=1024, temperature=0.7, do_sample=True, top_p=0.9)
-        #     generated_ids = [
-        #         output_ids[len(input_ids) :]
-        #         for input_ids, output_ids in zip(inputs.input_ids, output_ids)
-        #     ]
-        #     output_text = processor.batch_decode(
-        #         generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True
-        #     )
-        #     pred = output_text if type(output_text) == str else output_text[0]
-        #     captions.append(pred)
-            
-        #     del inputs
-        #     del output_ids
-
-        #     res = {}
-        #     res["question"] = question
-        #     res["answer"] = answer
-        #     res["subquestions"] = subquestions[i]
-        #     res["captions"] = captions
-        #     # res["prediction"] = pred if type(pred) == str else pred[0]
-        #     wf.write(json.dumps(res)+"\n")
-
-        # except Exception as e:
-        #     print (e)
-        #     res = {}
-        #     res["question"] = question
-        #     res["answer"] = answer
-        #     res["subquestions"] = []
-        #     res["captions"] = []
-        #     wf.write(json.dumps(res)+"\n")
-        #     pass
-
-# with open("results_exp/"+file+"_"+dataset+"-step2.jsonl", "w") as wf:
+# with open("results_exp/"+file+"_"+dataset+"-step1.jsonl", "w") as wf:
 #     for i, meta in enumerate(ds):
 #         try:
 #             image = meta["decoded_image"] if dataset != "clevrmath" and dataset != "mathverse" and dataset != "seed" else meta["image"]
 #             question = meta["query"] if dataset == "mathvista" else meta["question"]
 #             answer = meta["answer"] if dataset != "clevrmath" else meta["label"]
-#             # system_prompt = "Your task is to answer the question about the image. When you’re ready to answer, conclude using the format \"Final answer: \""
-#             # system_prompt = "Your task is to answer the question about the image. First, you describe about the image using format ## Image Description: [Image description]\n\n and then give step by step reasoning based on image description.\nUse this step-by-step format:\n\n\##Step 1: [Concise description]\n[Brief explanation and calculations]\n\n## Step 2: [Concise description]\n[Brief explanation and calculations]\n\n...\n\nWhen you’re ready to answer, conclude using the format \"Final answer: \""
-#             # system_prompt = "Solve the following image related problem efficiently and clearly:\n\n- For simple problems (2 steps or fewer):\nProvide a concise solution with minimal explanation.\n\n- For complex problems (3 steps or more):\nUse this step-by-step format:\n\n## Step 1: [Concise description]\n[Brief explanation and calculations]\n\n## Step 2: [Concise description]\n[Brief explanation and calculations]\n\n...\n\nRegardless of the approach, always conclude with:\n\nTherefore, the final answer is: . I hope it is correct."
-#             # if "qwen" in model_name.lower():
-#             #     conversation = [
-#             #         {
-#             #             "role": "user",
-#             #             "content": [
-#             #                 {
-#             #                     "type": "image",
-#             #                 },
-#             #                 {"type": "text", 
-#             #                 "text":  system_prompt + "\n" + question
-#             #                 },
-#             #             ],
-#             #         }
-#             #     ]
-#             # elif "llama" in model_name.lower():
-#             # conversation = [
-#             #                 {"role": "user", "content": [
-#             #                     {"type": "image"},
-#             #                     {"type": "text", "text": question+"\nLet's break down the question into easier sub-questions. Write subquestions as 1.[subquestion]\n2.[subquestion]..."}
-#             #                 ]}
-#             #             ]
-#             # instruction="""
-#             # Let's break down the question into easier sub-questions. Write subquestions as 1.[subquestion]\n2.[subquestion]...
-#             # For example,
-#             # Question: \"original question\"
-#             # Sub-questions: 
-#             # 1. \"sub-question\"
-#             # 2. \"sub-question\"
-#             # 3. \"sub-question\"
-#             # ...
-#             # """
 #             conversation = [
 #                             {"role": "user", "content": [
 #                                 {"type": "image"},

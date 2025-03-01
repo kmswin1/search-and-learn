@@ -64,28 +64,48 @@ elif "llava-v1.6" in model_name.lower():
     processor.tokenizer.padding_side='left'
 
 file = model_name.split("/")[-1]
+subquestions=[]
+captions=[]
+questions=[]
+scene_graphs=[]
+filtered=[]
+with open("results_exp/"+file+"_"+dataset+"-step4.jsonl", "r") as f:
+    for line in f:
+        line = json.loads(line)
+        subquestions.append([line["question"]] + line["subquestions"])
+        captions.append(line["captions"])
+        scene_graphs.append(line["scene_graphs"])
+        filtered.append(line["filtered_scene_graphs"])
+
+# with open("results_exp/"+file+"_"+dataset+"-step3.jsonl", "r") as f:
+#     for line in f:
+#         line = json.loads(line)
+#         questions.append(line["question"])
         
-with open("results_exp/"+file+"_"+dataset+"-step1.jsonl", "w") as wf:
+# with open("results_exp/"+file+"_"+dataset+"-step5-no-subquestions.jsonl", "w") as wf:
+with open("results_exp/"+file+"_"+dataset+"-step5-no-verification.jsonl", "w") as wf:
     for i, meta in enumerate(tqdm(ds)):
         try:
             question = meta["query"] if dataset == "mathvista" else meta["question"]
             # if question in questions:
             #     continue
+            text_prompts = []
+            images = []
             answer = meta["answer"] if dataset != "clevrmath" else meta["label"]
             image = meta["decoded_image"] if dataset != "clevrmath" and dataset != "mathverse" and dataset != "seed" else meta["image"]
 
+            scene_graph = "\n\n".join(scene_graphs[i])
+            prompt = "Using image and scene graphs as a context and references to answer the question.\nNow, let’s answer the question step by step with rationales. When you’re ready to answer, conclude using the format \"Final answer: \""
             conversation = [
-                            {"role": "user", "content": [
-                                {"type": "image"},
-                                {"type": "text", "text": "Question: "+ q + "\nLet's break down the question into easier sub-questions. Write subquestions as 1.[subquestion]\n2.[subquestion]..."} 
-                            ]}
-                        ]
+                        {"role": "user", "content": [
+                            {"type": "image"},
+                            {"type": "text", "text": f"Scene graph: {scene_graph}\nQuestion: {question}\n{prompt}"} 
+                        ]}
+                    ]
+            text_prompts = [processor.apply_chat_template(conversation, add_generation_prompt=True)]
 
-
-            # Preprocess the inputs
-            text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
             inputs = processor(
-                text=[text_prompt], images=[image], padding=True, return_tensors="pt"
+                text=text_prompts, images=[image], padding=True, return_tensors="pt"
             )
             inputs = inputs.to("cuda")
             # Inference: Generation of the output
@@ -98,22 +118,27 @@ with open("results_exp/"+file+"_"+dataset+"-step1.jsonl", "w") as wf:
             output_text = processor.batch_decode(
                 generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True
             )
-            subquestions = output_text[0].split("\n")
-
+            pred = output_text
+            
             del inputs
             del output_ids
 
             res = {}
             res["question"] = question
             res["answer"] = answer
-            res["subquestions"] = subquestions
+            res["subquestions"] = subquestions[i]
+            res["captions"] = captions[i]
+            res["scene_graphs"] = scene_graphs[i]
+            res["filtered_scene_graphs"] = filtered[i]
+            res["prediction"] = pred if type(pred) == str else pred[0]
             wf.write(json.dumps(res)+"\n")
-
-        except Exception as e:
-            print (e)
+        except:
             res = {}
             res["question"] = question
             res["answer"] = answer
-            res["subquestions"] = []
+            res["subquestions"] = subquestions[i]
+            res["captions"] = captions[i]
+            res["scene_graphs"] = scene_graphs[i]
+            res["filtered_scene_graphs"] = filtered[i]
+            res["prediction"] = ""
             wf.write(json.dumps(res)+"\n")
-            pass
